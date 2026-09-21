@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>週清表</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+  body {
+    font-family: "Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif;
+    background: #e9ecef; color: #1a1a1a;
+  }
+
+  .controls {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; gap: 14px;
+    padding: 12px 24px; background: #fff;
+    border-bottom: 2px solid #dee2e6;
+    flex-wrap: wrap; justify-content: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,.08);
+  }
+  .controls label { font-size: 14px; font-weight: 600; }
+  .controls select {
+    padding: 6px 10px; border-radius: 6px;
+    border: 1px solid #ced4da; font-size: 14px;
+    font-family: inherit; background: #fff;
+  }
+  .controls button {
+    padding: 8px 22px; border: none; border-radius: 6px;
+    font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit;
+  }
+  .btn-gen { background: #2c3e50; color: #fff; }
+  .btn-print { background: #2980b9; color: #fff; }
+  .btn-gen:hover,.btn-print:hover { opacity: .85; }
+  .hint { font-size: 12px; color: #888; width: 100%; text-align: center; margin-top: 2px; }
+
+  .print-area { padding: 16px; }
+  .page {
+    width: 290mm; height: 205mm;
+    background: #fff; margin: 0 auto 20px;
+    padding: 3mm 4mm 2mm;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .page-title {
+    text-align: center;
+    font-size: 16pt; font-weight: 800;
+    letter-spacing: 8px; margin-bottom: 0.5mm;
+    flex-shrink: 0; line-height: 1.2;
+  }
+
+  .months-outer {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr 1fr;
+    gap: 1mm;
+  }
+
+  .page-subtitle {
+    text-align: center;
+    font-size: 9pt; color: #555;
+    margin-bottom: 0.5mm;
+    flex-shrink: 0;
+  }
+
+  .month-label {
+    background-color: #2c3e50 !important; color: #fff !important;
+    text-align: center;
+    font-size: 11pt; font-weight: 700;
+    padding: 2px 0; letter-spacing: 3px;
+  }
+
+  .month-table {
+    width: 100%; border-collapse: collapse; table-layout: fixed;
+  }
+  .month-table th, .month-table td {
+    border: 1px solid #555;
+    font-size: 9pt;
+    padding: 0; line-height: 1.2;
+  }
+  .month-table thead th {
+    background-color: #dde1e4 !important;
+    font-weight: 700;
+    font-size: 8.5pt; padding: 2px 1px;
+    text-align: center;
+  }
+  .month-table thead th:first-child { width: 13%; }
+
+  .month-table tbody td {
+    height: 7.5mm;
+    vertical-align: top;
+    padding: 0;
+  }
+  .month-table tbody td:first-child {
+    text-align: center; vertical-align: middle;
+    font-size: 8pt; font-weight: 600;
+    background-color: #f0f1f2 !important;
+    line-height: 1.15; padding: 1px;
+  }
+
+  .cell-inner {
+    display: flex; flex-direction: column;
+    height: 100%;
+  }
+  .cell-sign, .cell-date {
+    flex: 1;
+    display: flex; align-items: flex-end;
+    padding: 0 3px 0.5px;
+    font-size: 8pt; color: #aaa;
+  }
+  .cell-sign { border-bottom: 1px dashed #ccc; }
+
+  .week-date {
+    display: block; font-size: 7pt;
+    font-weight: 400; color: #777; margin-top: 0.5px;
+  }
+
+  @media print {
+    @page { size: A4 landscape; margin: 0; }
+    body { background: #fff; }
+    .controls { display: none !important; }
+    .print-area { padding: 0; }
+    .page {
+      width: 297mm; height: 210mm;
+      margin: 0; padding: 3mm 4mm 2mm;
+      box-shadow: none; border: none;
+      page-break-after: always;
+    }
+    .page:last-child { page-break-after: auto; }
+  }
+  @media screen {
+    .page { box-shadow: 0 2px 12px rgba(0,0,0,.12); border: 1px solid #ddd; }
+  }
+</style>
+</head>
+<body>
+
+<div class="controls">
+  <label>年份：</label>
+  <select id="selYear"></select>
+  <label>起始月：</label>
+  <select id="selMonth"></select>
+  <label>頁數：</label>
+  <select id="selPages">
+    <option value="1">1 頁（6 個月）</option>
+    <option value="2" selected>2 頁（12 個月）</option>
+  </select>
+  <button class="btn-gen" id="btnGen">產生週清表</button>
+  <button class="btn-print" id="btnPrint">🖨️ 列印 / 存 PDF</button>
+  <div class="hint">列印時請選「橫向」＋邊界「無」＋勾選「背景圖形」＋縮放「100%」</div>
+</div>
+
+<div class="print-area" id="printArea"></div>
+
+<script>
+(function(){
+  var tasks = ['清潔糖機','清洗大垃圾桶','茶桶(用具)\n泡酵素','茶桶布\n泡酵素','洗掃把、拖把'];
+  var selYear = document.getElementById('selYear');
+  var selMonth = document.getElementById('selMonth');
+  var now = new Date(), curY = now.getFullYear();
+
+  for (var y = 2026; y <= 2056; y++) {
+    var o = document.createElement('option');
+    o.value=y; o.textContent=y+' 年';
+    if(y===curY) o.selected=true;
+    selYear.appendChild(o);
+  }
+  for (var m=1; m<=12; m++) {
+    var o2 = document.createElement('option');
+    o2.value=m; o2.textContent=m+' 月';
+    if(m===now.getMonth()+1) o2.selected=true;
+    selMonth.appendChild(o2);
+  }
+
+  function getWeeks(year,month) {
+    var last = new Date(year,month,0).getDate();
+    var dow = new Date(year,month-1,1).getDay();
+    var weeks=[], s=1;
+    var e = dow===0?1:(7-dow+1);
+    if(e>last) e=last;
+    weeks.push([s,e]); s=e+1;
+    while(s<=last){ e=Math.min(s+6,last); weeks.push([s,e]); s=e+1; }
+    if (weeks.length > 5) {
+      var lastW = weeks.pop();
+      weeks[weeks.length-1][1] = lastW[1];
+    }
+    return weeks;
+  }
+
+  function buildMonth(year,month) {
+    var weeks = getWeeks(year,month);
+    var h = '<div class="month-label">'+year+' 年 '+month+' 月</div>';
+    h += '<table class="month-table"><thead><tr>';
+    var headers = ['週次'].concat(tasks);
+    for(var i=0;i<headers.length;i++) h+='<th>'+headers[i].replace(/\n/g,'<br>')+'</th>';
+    h += '</tr></thead><tbody>';
+
+    for(var w=0;w<weeks.length;w++){
+      var wk=weeks[w];
+      h += '<tr>';
+      h += '<td>第'+(w+1)+'週<span class="week-date">'+month+'/'+wk[0]+'–'+month+'/'+wk[1]+'</span></td>';
+      for(var t=0;t<tasks.length;t++){
+        h += '<td><div class="cell-inner">';
+        h += '<div class="cell-sign">簽：</div>';
+        h += '<div class="cell-date">日：</div>';
+        h += '</div></td>';
+      }
+      h += '</tr>';
+    }
+    h += '</tbody></table>';
+    return h;
+  }
+
+  function generate(){
+    var area = document.getElementById('printArea');
+    area.innerHTML='';
+    var startY=parseInt(selYear.value);
+    var startM=parseInt(selMonth.value);
+    var pages=parseInt(document.getElementById('selPages').value);
+    var total=6*pages, idx=0;
+
+    for(var p=0;p<pages;p++){
+      var page=document.createElement('div');
+      page.className='page';
+      var title=document.createElement('div');
+      title.className='page-title';
+      title.textContent='週  清  表';
+      page.appendChild(title);
+
+      var subtitle=document.createElement('div');
+      subtitle.className='page-subtitle';
+      subtitle.textContent='※ 確實完成後填寫完成日期並簽名';
+      page.appendChild(subtitle);
+
+      var outer=document.createElement('div');
+      outer.className='months-outer';
+
+      for(var i=0;i<6;i++){
+        var cell=document.createElement('div');
+        if(idx<total){
+          var yr=startY, mo=startM+idx;
+          while(mo>12){mo-=12;yr++;}
+          cell.innerHTML=buildMonth(yr,mo);
+          idx++;
+        }
+        outer.appendChild(cell);
+      }
+      page.appendChild(outer);
+      area.appendChild(page);
+    }
+  }
+
+  document.getElementById('btnGen').addEventListener('click',generate);
+  document.getElementById('btnPrint').addEventListener('click',function(){window.print();});
+  generate();
+})();
+</script>
+</body>
+</html>
